@@ -189,7 +189,7 @@ after_initialize do
         #
         # In the latter case, everyone will start their thread with the canonical reference,
         # because we send it in the References header for all emails.
-        topic_canonical_reference_id = Email::MessageIdService.generate_default(topic)
+        topic_canonical_reference_id = Email::MessageIdService.generate_default
 
         referenced_posts = Post.includes(:incoming_email)
           .joins("INNER JOIN post_replies ON post_replies.post_id = posts.id ")
@@ -214,7 +214,7 @@ after_initialize do
         # The References header is how mail clients handle threading. The Message-ID
         # must always be unique.
         if post.post_number == 1
-          @message.header['Message-ID']  = Email::MessageIdService.generate_default(topic)
+          @message.header['Message-ID']  = Email::MessageIdService.generate_default
           @message.header['References']  = [topic_canonical_reference_id]
         else
           @message.header['Message-ID']  = Email::MessageIdService.generate_for_post(post)
