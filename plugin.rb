@@ -169,6 +169,8 @@ after_initialize do
 
       if topic_id.present? && post_id.present?
         post = Post.find_by(id: post_id, topic_id: topic_id)
+        host = Email::MessageIdService.host
+        random_suffix = SecureRandom.hex(12)
 
         # guards against deleted posts and topics
         return skip(SkippedEmailLog.reason_types[:sender_post_deleted]) if post.blank?
@@ -189,7 +191,17 @@ after_initialize do
         #
         # In the latter case, everyone will start their thread with the canonical reference,
         # because we send it in the References header for all emails.
-        topic_canonical_reference_id = Email::MessageIdService.generate_default
+
+
+        # topic_canonical_reference_id = Email::MessageIdService.generate_for_topic(
+        #   topic, canonical: true, use_incoming_email_if_present: true
+        # )
+        first_post = topic.ordered_posts.first
+        if first_post.incoming_email&.message_id.present?
+          topic_canonical_reference_id = "<#{first_post.incoming_email.message_id}>"
+        else
+          topic_canonical_reference_id = "<topic/#{topic.id}@#{host}>"
+        end
 
         referenced_posts = Post.includes(:incoming_email)
           .joins("INNER JOIN post_replies ON post_replies.post_id = posts.id ")
@@ -203,7 +215,8 @@ after_initialize do
             if referenced_post.post_number == 1
               topic_canonical_reference_id
             else
-              Email::MessageIdService.generate_for_post(referenced_post)
+              # Email::MessageIdService.generate_for_post(referenced_post)
+              "<topic/#{referenced_post.topic_id}/#{referenced_post.id}.#{random_suffix}@#{host}>"
             end
           end
         end
@@ -217,7 +230,8 @@ after_initialize do
           @message.header['Message-ID']  = Email::MessageIdService.generate_default
           @message.header['References']  = [topic_canonical_reference_id]
         else
-          @message.header['Message-ID']  = Email::MessageIdService.generate_for_post(post)
+          # @message.header['Message-ID']  = Email::MessageIdService.generate_for_post(post)
+          @message.header['Message-ID']  = "<topic/#{post.topic_id}/#{post.id}.#{random_suffix}@#{host}>"
           @message.header['In-Reply-To'] = referenced_post_message_ids[0] || topic_canonical_reference_id
           @message.header['References']  = [topic_canonical_reference_id, referenced_post_message_ids].flatten.compact.uniq
         end
